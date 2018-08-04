@@ -1,0 +1,29 @@
+#! /sbin/sh
+#
+# pam_dce_cache startup script
+#
+CACHE_DIR=/opt/dcelocal/var/security/cache
+
+case $1 in
+'start')
+    if [ ! -d $CACHE_DIR ] ; then
+        mkdir $CACHE_DIR
+        chown root:sys $CACHE_DIR
+        chmod 700 $CACHE_DIR
+    else
+        find $CACHE_DIR -type f | xargs rm -f
+    fi
+
+    for d in `awk 'BEGIN {for (i = 0; i < 100; i++) printf "%02d\n", i}' < /dev/null` ; do
+        if [ ! -d $CACHE_DIR/$d ] ; then
+            mkdir $CACHE_DIR/$d
+            chown root:sys $CACHE_DIR/$d
+            chmod 700 $CACHE_DIR/$d
+        fi
+    done
+    ;;
+'stop')
+    ;;
+*)
+    echo "Usage: $0 {start|stop}"
+esac
