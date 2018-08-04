@@ -1,6 +1,6 @@
 #! /sbin/sh
 #
-# pam_dce_cache startup script
+# dce_cache startup script
 #
 CACHE_DIR=/opt/dcelocal/var/security/cache
 

@@ -7,11 +7,18 @@
 #
 
 CC = gcc
-CFLAGS = -fpic -D_REENTRANT -DPIC -D_TS_ERRNO
+CFLAGS = -I/opt/dce/share/include -fpic -D_REENTRANT -DPIC -D_TS_ERRNO
+
+# uncomment to allow only root (as opposed to root and the credential owner)
+# to access the cache
+#CFLAGS += -DROOT_ONLY
+
+# uncomment for "broken" IBM DCE implementations
+CFLAGS += -DIBM_DCE_ONLY
 
 LIBS = -ldce -lpam -lsocket -lnsl
 
-OBJECTS = pam_dce_cache.o
+OBJECTS = pam_dce_cache.o dce_cache.o
 
 all:	pam_dce_cache.so.1
 
@@ -25,9 +32,6 @@ install: pam_dce_cache.so.1
 	cp pam_dce_cache.so.1 /usr/lib/security/pam_dce_cache.so.1
 	chown root:sys /usr/lib/security/pam_dce_cache.so.1
 	chmod 755 /usr/lib/security/pam_dce_cache.so.1
-	cp S15-15pam_dce_cache /etc/rc3.d/S15-15pam_dce_cache
-	chown root:sys /etc/rc3.d/S15-15pam_dce_cache
-	chmod 700 /etc/rc3.d/S15-15pam_dce_cache
 
 clean:
 	rm -f *.o *~ pam_dce_cache.so.1
