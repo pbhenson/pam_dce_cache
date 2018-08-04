@@ -108,6 +108,8 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
       debug = 1;
     else if (strcmp(argv[index], "ignore_root") == 0)
       ignore_root = 1;
+    else if (strcmp(argv[index], "ignore_delete") == 0)
+      ;
     else if (strcmp(argv[index], "ignore_root_auth") == 0)
       ignore_root_auth = 1;
     else if (strcmp(argv[index], "forwardable") == 0)
@@ -294,6 +296,7 @@ int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
   int debug = 0;
   int ignore_root = 0;
+  int ignore_delete = 0;
   int index;
   int status;
   sec_login_handle_t dce_context;
@@ -306,6 +309,8 @@ int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
       debug = 1;
     else if (strcmp(argv[index], "ignore_root") == 0)
       ignore_root = 1;
+    else if (strcmp(argv[index], "ignore_delete") == 0)
+      ignore_delete = 1;
     else if (strcmp(argv[index], "ignore_root_auth") == 0)
       ignore_root = 1;
     else if (strcmp(argv[index], "forwardable") == 0)
@@ -323,11 +328,18 @@ int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
   if (debug)
     syslog(LOG_AUTH|LOG_ERR, "pam_dce_cache.pam_sm_setcred called - ignore_root=%d", ignore_root);
   
-  if (flags != PAM_ESTABLISH_CRED) {
+  if (flags != PAM_ESTABLISH_CRED && flags != PAM_DELETE_CRED) {
     if (debug)
-      syslog(LOG_AUTH|LOG_ERR, "pam_dce_cache.pam_sm_setcred - flags != PAM_ESTABLISH_CRED, returning PAM_IGNORE");
+      syslog(LOG_AUTH|LOG_ERR, "pam_dce_cache.pam_sm_setcred - flags %d not supported, returning PAM_IGNORE", flags);
     
     return PAM_IGNORE;
+  }
+
+  if (flags == PAM_DELETE_CRED) {
+    if (! ignore_delete)
+      resetpag();
+
+    return PAM_SUCCESS;
   }
 
   if ((status = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS) {
@@ -414,19 +426,23 @@ int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
       snprintf(path, MAXPATHLEN, "%s/dcecred_%08x", CREDS_DIR, pag);
       path[MAXPATHLEN-1] = '\0';
-      chown(path, pwd.pw_uid, pwd.pw_gid);
+      if (chown(path, pwd.pw_uid, pwd.pw_gid))
+	syslog(LOG_AUTH|LOG_ERR, "pam_dce_cache.pam_sm_setcred - chown failed %m");
       
       snprintf(path, MAXPATHLEN, "%s/dcecred_%08x.data", CREDS_DIR, pag);
       path[MAXPATHLEN-1] = '\0';
-      chown(path, pwd.pw_uid, pwd.pw_gid);
+      if (chown(path, pwd.pw_uid, pwd.pw_gid))
+	syslog(LOG_AUTH|LOG_ERR, "pam_dce_cache.pam_sm_setcred - chown .data failed %m");
 
       snprintf(path, MAXPATHLEN, "%s/dcecred_%08x.data.db", CREDS_DIR, pag);
       path[MAXPATHLEN-1] = '\0';
-      chown(path, pwd.pw_uid, pwd.pw_gid);
+      if (chown(path, pwd.pw_uid, pwd.pw_gid))
+	syslog(LOG_AUTH|LOG_ERR, "pam_dce_cache.pam_sm_setcred - chown .data.db failed %m");
 
       snprintf(path, MAXPATHLEN, "%s/dcecred_%08x.nc", CREDS_DIR, pag);
       path[MAXPATHLEN-1] = '\0';
-      chown(path, pwd.pw_uid, pwd.pw_gid);
+      if (chown(path, pwd.pw_uid, pwd.pw_gid))
+	syslog(LOG_AUTH|LOG_ERR, "pam_dce_cache.pam_sm_setcred - chown .nc failed %m");
     }
 #endif
 

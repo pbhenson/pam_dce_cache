@@ -326,6 +326,9 @@ unsigned long dce_cache_authenticate(uid_t uid, char *user, char *password, int 
   AP_MD5_CTX md5_context;
   unsigned long pag;
   struct stat statbuf;
+#ifdef IBM_DCE_ONLY
+  struct stat checkstatbuf;
+#endif
   char cache_md5[16];
   char import_buf[MAXPATHLEN+5];
   sec_login_handle_t login_context;
@@ -433,7 +436,7 @@ unsigned long dce_cache_authenticate(uid_t uid, char *user, char *password, int 
       error_buf[error_buf_size-1] = '\0';
       return 0;
     }
-
+    
     if (forwardable) {
       tkt_info.options = sec_login_tkt_forwardable;
       sec_login_tkt_request_options(login_context, &tkt_info, &status);
@@ -445,6 +448,14 @@ unsigned long dce_cache_authenticate(uid_t uid, char *user, char *password, int 
     strncpy( (char *)tmp_pw, password, sec_passwd_str_max_len);
     tmp_pw[sec_passwd_str_max_len] = '\0';
     pw_entry.key.tagged_union.plain = &(tmp_pw[0]);
+    
+#ifdef IBM_DCE_ONLY
+    if (stat(import_buf+5, &statbuf)) {
+      snprintf(error_buf, error_buf_size, "stat failed - %d", errno);
+      error_buf[error_buf_size-1] = '\0';
+      return 0;
+    }
+#endif
 
     if (
 #ifndef ROOT_ONLY
@@ -454,6 +465,21 @@ unsigned long dce_cache_authenticate(uid_t uid, char *user, char *password, int 
       sec_login_valid_and_cert_ident(login_context, &pw_entry, &reset_passwd, &auth_src, &status);
     else
       sec_login_validate_identity(login_context, &pw_entry, &reset_passwd, &auth_src, &status);
+    
+#ifdef IBM_DCE_ONLY
+    if (stat(import_buf+5, &checkstatbuf)) {
+      snprintf(error_buf, error_buf_size, "stat failed - %d", errno);
+      error_buf[error_buf_size-1] = '\0';
+      return 0;
+    }
+    else if (checkstatbuf.st_uid == 0) {
+      if (chown(import_buf+5, statbuf.st_uid, statbuf.st_gid)) {
+	snprintf(error_buf, error_buf_size, "stat failed - %d", errno);
+	error_buf[error_buf_size-1] = '\0';
+	return 0;
+      }
+    }
+#endif
 
     if (status) {
       snprintf(error_buf, error_buf_size, "sec_login_validate_identity failed - %d", status);
